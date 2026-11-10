@@ -1,0 +1,20 @@
+{
+  "name": "agent-office",
+  "version": "0.1.0",
+  "description": "A live 3D office of your Claude Code sessions and subagents, fed by Claude Code hooks.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "agent-office": "bin/agent-office.mjs"
+  },
+  "scripts": {
+    "start": "node bin/agent-office.mjs start",
+    "demo": "node bin/agent-office.mjs demo",
+    "install-hooks": "node bin/agent-office.mjs install",
+    "test": "node --test test/*.test.mjs"
+  }
+}

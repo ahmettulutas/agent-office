@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Office</title>
+<link rel="icon" href="/favicon.svg">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <span class="logo" aria-hidden="true"></span>
+    <h1>Agent Office</h1>
+    <span id="conn" class="conn off">connecting</span>
+  </div>
+  <div class="stats" aria-label="Agent counts">
+    <span class="stat"><span class="dot st-busy"></span><b id="c-working">0</b> working</span>
+    <span class="stat"><span class="dot st-needs-you"></span><b id="c-waiting">0</b> need you</span>
+    <span class="stat"><span class="dot st-idle"></span><b id="c-idle">0</b> idle</span>
+    <span class="stat"><span class="dot st-running"></span><b id="c-subs">0</b> subagents</span>
+  </div>
+  <div class="tools">
+    <button id="zoom-out" type="button" title="Zoom out (-)" aria-label="Zoom out">&minus;</button>
+    <button id="zoom-in" type="button" title="Zoom in (+, wheel, double-click)" aria-label="Zoom in">+</button>
+    <button id="zoom-fit" type="button" title="Show the whole floor (0)">Fit</button>
+    <button id="settings-open" type="button" aria-expanded="false" aria-controls="settings" title="Sound and settings (S)">Settings</button>
+    <button id="light" type="button" title="Lighting: follow the clock, or force day or night (N)">Auto light</button>
+    <button id="labels" type="button" aria-pressed="true" title="Show every name tag (L)">Labels</button>
+  </div>
+</header>
+<main class="layout">
+  <section id="stage" class="stage">
+    <canvas id="office" aria-label="Office floor with your Claude Code agents"></canvas>
+    <div id="tip" class="tip" hidden></div>
+    <div id="settings" class="settings" role="dialog" aria-labelledby="settings-title" hidden>
+      <div class="settings-head">
+        <h2 id="settings-title">Settings</h2>
+        <button id="settings-close" type="button" class="icon-btn" aria-label="Close settings">&times;</button>
+      </div>
+      <label class="switch-row">
+        <span>
+          <b>Sound when an agent needs you</b>
+          <small>Plays on this computer, even when this page is closed.</small>
+        </span>
+        <input id="sound-on" type="checkbox" role="switch">
+      </label>
+      <label class="switch-row">
+        <span>
+          <b>Desktop notification</b>
+          <small>Says which session needs you, next to the sound.</small>
+        </span>
+        <input id="notify-on" type="checkbox" role="switch">
+      </label>
+      <label class="select-row">
+        <span>
+          <b>Remind me while it waits</b>
+          <small>Plays it again until you answer.</small>
+        </span>
+        <select id="remind"></select>
+      </label>
+      <fieldset id="sound-list" class="sound-list">
+        <legend>Sound</legend>
+      </fieldset>
+      <p id="settings-note" class="settings-note" aria-live="polite"></p>
+    </div>
+    <div id="empty" class="empty">
+      <p class="empty-title">The office is empty</p>
+      <p>Start <code>claude</code> anywhere and your session walks in. Subagents join it at their desks.</p>
+      <p class="muted">Want to see it busy? Run <code>agent-office demo</code>.</p>
+    </div>
+  </section>
+  <aside class="side">
+    <h2>Sessions</h2>
+    <div id="list" class="list"></div>
+    <div id="details" class="details" hidden></div>
+    <footer class="legend">
+      <p><b>Leads</b> are your sessions. <b>Research</b>: Explore and analysts. <b>Meeting room</b>: Plan. <b>Review &amp; QA</b>: reviewers and testers. Everyone else works on the <b>dev floor</b>.</p>
+      <p>Idle leads take breaks in the cafe and lounge. A red <b>!</b> means a session waits for you. Click anyone for details. A sound plays when one needs you: pick it in Settings (S), B turns it on or off. L toggles labels, Esc clears the selection.</p>
+    </footer>
+  </aside>
+</main>
+<script type="module" src="/app.js"></script>
+</body>
+</html>
