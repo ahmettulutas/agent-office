@@ -208,7 +208,10 @@ export function draw(ts) {
 
   const { scale, ox, oy, dpr } = view;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.fillStyle = "#0e1017";
+  // the background gets the same night tint as the office, so the dark has no edge
+  const k = env.dark > 0.01 ? Math.min(1, env.dark * 1.15) : 0;
+  const mixC = (b, o) => Math.round(b * (1 - k) + o * k);
+  ctx.fillStyle = `rgb(${mixC(14, 12)},${mixC(16, 16)},${mixC(23, 40)})`;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   if (!staticKey) return;
   ctx.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * ox, dpr * oy);

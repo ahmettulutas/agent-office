@@ -1,187 +1,165 @@
 # Agent Office
 
-A live 3D office of your Claude Code agents, seen from above at an angle. Each session is a lead at a
-desk, and each subagent is a coworker who walks in and works in the room that
-fits its type. When it finishes, it hands its paper to the lead and leaves.
-Idle leads go to the cafe and the lounge, and a session that waits for you
-stands up, waves, shows a red `!`, a sound of your choice plays and a desktop
-notification says which session it is.
+**A live 3D office of your Claude Code sessions and subagents.** Every session
+is a lead at a desk, every subagent a coworker who walks into the room that fits
+its job. You see at a glance who is working, who is done, and who is waiting
+for you. When one needs you, a sound plays on your computer and a notification
+says which one.
 
-It runs by itself: Claude Code hooks start the server the first time a session
-reports anything, and open the page when a session starts and no page is open.
+![The office by day: six sessions, subagents in every room, one waiting for you](docs/screenshots/office.jpg)
 
-No dependencies, Node 20+ only. Everything stays on `127.0.0.1`.
+- **Runs by itself.** Claude Code hooks start it the first time a session reports
+  anything. No extra terminal, no build step.
+- **Never misses a question.** Permission prompts, Claude's own questions and
+  plan approvals play a sound (six to pick from) and show a desktop notification,
+  and remind you again while they wait.
+- **Private.** It keeps only event and tool names and short labels, never your
+  prompts, code or output, and listens on `127.0.0.1` only.
+- **No dependencies.** Plain Node 20+ and a browser. Everything is drawn in code.
 
-## Setup
+## Contents
+
+- [Screenshots](#screenshots)
+- [Quick start](#quick-start)
+- [How to use it](#how-to-use-it)
+- [Commands](#commands)
+- [Settings](#settings)
+- [How it works](#how-it-works)
+- [Privacy and security](#privacy-and-security)
+- [Troubleshooting](#troubleshooting)
+- [Uninstall](#uninstall)
+- [Development](#development)
+
+## Screenshots
+
+| | |
+| --- | --- |
+| ![Leads at their desks, one standing and waving because it needs your OK](docs/screenshots/desks.jpg) | ![The research room with its bookcase and the meeting room where Plan agents sit](docs/screenshots/rooms.jpg) |
+| **Your sessions at work.** Speech bubbles show the tool and file; the one waiting for you stands up and waves. | **Rooms by job.** Explore agents in research, Plan agents in the meeting room, reviewers and testers in QA. |
+| ![The cafe and lounge, where idle sessions take a break](docs/screenshots/lounge.jpg) | ![The settings panel: sound on or off, notifications, reminders and six sounds](docs/screenshots/settings.jpg) |
+| **Breaks.** Idle sessions get coffee, sit on the sofa, play ping-pong or the arcade. | **Settings.** Sound, notifications, reminders, and a Play button for each sound. |
+
+![The office at night: lamps, screens and pendant lights glowing, city lights in the windows](docs/screenshots/night.jpg)
+
+*At night the windows show the city lights and the office is lit by its lamps
+and screens. The light follows your clock, or you can force day or night.*
+
+## Quick start
+
+You need [Node.js](https://nodejs.org) 20 or newer and Claude Code.
 
 ```bash
-cd ~/Desktop/projects/agent-office
+git clone https://github.com/ahmettulutas/agent-office.git
+cd agent-office
 npm link                  # puts the agent-office command on your PATH
-agent-office install      # adds async hooks to ~/.claude/settings.json (backs it up first)
+agent-office install      # adds the hooks to ~/.claude/settings.json (backs it up first)
 ```
 
-Without `npm link`, run the same commands as `node bin/agent-office.mjs <command>`.
+That's all. Start `claude` (or a session in the Claude desktop app) and the
+office opens at <http://127.0.0.1:47800/>.
 
-That's all. Run `claude` (or open a session in the desktop app) and the office
-opens at <http://127.0.0.1:47800/>.
-
-To try it with no real sessions:
+No sessions yet? Watch a scripted day at the office:
 
 ```bash
 agent-office demo
 ```
 
+Without `npm link`, run every command as `node bin/agent-office.mjs <command>`.
+
+## How to use it
+
+### Reading the office
+
+| what you see | what it means |
+| --- | --- |
+| A lead in a **blazer and tie** at a desk | one of your sessions |
+| A coworker in a **team colour** with a badge | a subagent, in the room for its job |
+| A speech bubble (`Edit: Cart.tsx`) | the tool it is running right now |
+| Green dots over the head | working |
+| **Standing, waving, red `!`** | waiting for you: a permission prompt, a question or a plan to approve |
+| Walking to the lead with a paper, then a green check | a subagent finished and hands in its work |
+| On the sofa, at the coffee bar, at ping-pong | idle, taking a break |
+| `z z z` | idle at the desk for a while |
+
+The rooms:
+
+| room | who works there |
+| --- | --- |
+| Leads and dev floor | your sessions up front; `general-purpose` and other subagents behind them |
+| Research | `Explore`, analysts, web fetch, docs and guide agents |
+| Meeting room | `Plan`, orchestrators, architects |
+| Review & QA | reviewers, testers, security and audit agents |
+| Cafe and lounge | idle sessions on a break |
+
+When a room is full, the rest sit on the dev floor. When every desk is taken,
+people work standing in the corridor with a laptop, and take a desk as soon as
+one is free.
+
+Click anyone for details: their state, current tool, the last 25 tools with how
+long each took, and for a lead a dotted line to each of its subagents. The side
+panel lists every session and subagent; click a row to select it.
+
+Zoomed far out, where people are only a few pixels tall, each one gets a pin in
+the colour of their state: green working, orange a subagent at work, red waiting
+for you (it bounces), grey idle.
+
+### Controls
+
+| | mouse and keyboard | touch screen |
+| --- | --- | --- |
+| Zoom | wheel, trackpad pinch, `+` / `-`, or the buttons | pinch |
+| Zoom in on a spot | double click | double tap |
+| Pan | drag | drag with one finger |
+| Show the whole office | `0` or **Fit** | **Fit** |
+| Select someone | click | tap |
+| Follow them | `F` or **Follow** in the details | **Follow** |
+| Name tags on or off | `L` or **Labels** | **Labels** |
+| Light: auto, day, night | `N` or the light button | the light button |
+| Settings | `S` or **Settings** | **Settings** |
+| Sound on or off | `B` | in Settings |
+| Clear the selection | `Esc` | tap the floor |
+
+### When an agent needs you
+
+A session waits for you when Claude asks for permission, asks you a question,
+wants a plan approved, or an MCP tool asks for input. Then:
+
+1. Its lead stands up and waves, with a red `!` and the reason ("needs your OK").
+2. The **sound** you picked plays. It plays from the server, so it works with the
+   page closed, and several agents asking at once play it once.
+3. A **desktop notification** says who and why: "web-shop (Explore) needs your OK".
+4. While it keeps waiting, the sound and notification come **again every few
+   minutes** (3 by default) until you answer.
+
+Open **Settings** (`S`) to change any of it:
+
+| setting | choices |
+| --- | --- |
+| Sound when an agent needs you | on or off |
+| Desktop notification | on or off |
+| Remind me while it waits | never, every 1, 3, 5 or 10 minutes |
+| Sound | Brass bell, Alarm clock, Ship's bell, Door chime, Digital beeps, Gong; each has a **Play** button |
+
 ## Commands
 
 | command | what it does |
 | --- | --- |
-| `install [--yes]` | add the hooks to `~/.claude/settings.json`, after yours; a backup goes to `~/.agent-office/backups/` |
-| `uninstall [--yes]` | remove exactly those hooks (they all end in `# agent-office`) |
-| `start [--no-open]` | run the server in this terminal |
-| `on` / `off` | run it in the background, or stop it |
-| `open` | open the page, starting the server if needed |
-| `status` | running or not, hooks installed or not, which sound |
-| `sound on` / `sound off` | turn the sound on or off |
-| `sound list` / `sound use <name>` | list the sounds, or pick one |
-| `sound test [name]` | play the chosen sound, or another one, now |
-| `demo [--short]` | three fake sessions and their subagents for about a minute |
-
-`npm test` runs the tests: the state machine and privacy filter, the floor plan
-and paths, the 3D draw order, the sounds, and a real server in a temporary home
-(host and origin checks, settings, sound, notifications, reminders, Esc).
-
-## The office
-
-| room | who works there |
-| --- | --- |
-| Leads row | your sessions, one desk each |
-| Research | `Explore`, analysts, web fetch, docs and guide agents |
-| Meeting room | `Plan`, orchestrators, architects |
-| Review & QA | reviewers, testers, security and audit agents |
-| Dev floor | everyone else (`general-purpose`, developers, workers) |
-| Cafe, lounge | idle leads on a break: coffee, sofa, ping-pong, arcade, bean bags |
-
-When a room is full, the rest sit on the dev floor. When every desk is taken,
-people work standing in the corridor with a laptop, and move to a desk as soon
-as one is free.
-
-Controls: wheel, trackpad pinch or `+`/`-` to zoom, drag to pan, double-click
-to zoom in, `0` to fit the floor again, click someone for details, `F` to
-follow them, `L` for name tags, `N` for the lighting (auto follows your clock,
-or force day or night), `S` for Settings, `B` to turn the sound on or off,
-`Esc` to clear. On a touch screen: drag with one finger, pinch with two, tap
-to select, double tap to zoom in.
-
-Zoomed out, where people are only a few pixels tall, each one gets a pin in the
-colour of their state: green working, orange a subagent at work, red waiting for
-you (it bounces), grey idle.
-
-Everything is drawn in code, in an isometric 3D view at screen resolution, so
-it stays sharp at any zoom. Every object is a lit 3D model: walls with windows
-that show the sky and city of the hour, glass partitions with frosted room
-names, desks with monitors, keyboards and mugs, mesh office chairs, bookcases,
-server racks, a cafe counter with an espresso machine and pendant lamps, a
-lounge with a sofa, TV, ping-pong table and arcade cabinets. Things cast soft
-shadows away from the windows, sunlight falls through the panes by day, and
-lamps, screens and arcades light up the dark at night. People are small 3D
-figures with faces, hair and outfits, so walking, sitting, typing and waving
-look right from every side: leads wear a blazer and tie, subagents wear their
-team colour and a badge. They walk the shortest way, cutting across rooms in
-straight lines, and step aside when they pass each other.
-
-The page, in `web/`:
-
-| file | what it holds |
-| --- | --- |
-| `app.js` | the frame loop and the live data |
-| `office.js` | what people do: seats, breaks, hand-offs, walking |
-| `render.js` | drawing a frame: layers, light, pins, labels |
-| `camera.js` | zoom, pan and follow |
-| `input.js` | mouse, touch and keys |
-| `panel.js`, `settings.js` | the side panel and the settings panel |
-| `map.js` | the floor plan and path finding |
-| `iso.js` | the projection and 3D primitives |
-| `scene.js` | walls, glass, draw order and the static layer |
-| `furniture.js` | every piece of furniture |
-| `people.js`, `look.js` | people and how each one looks |
-| `floors.js` | floors, rugs and the time of day |
-
-## The sound
-
-When a session or one of its subagents starts waiting for you (a permission
-prompt, a question, or a request for input), the server plays a sound. It
-plays on the server, not in the page, so it works with the page closed and is
-not blocked by the browser. Several agents asking at once play it once (at most
-every 6 seconds), and a session that is already waiting does not play it again.
-
-Pick it in **Settings** in the page header (or press `S`): a switch turns it
-on or off, and each sound has a Play button to hear it first. The choice is
-saved to `~/.agent-office/config.json`, so the terminal and the page agree.
-
-| sound | what it is |
-| --- | --- |
-| `bell` | Brass bell: three strikes of a hand bell, loud and bright (default) |
-| `alarm` | Alarm clock: a fast ringing bell for a second and a half, the hardest to miss |
-| `ship` | Ship's bell: two pairs of strikes, lower and fuller |
-| `chime` | Door chime: a two-note ding-dong, gentler |
-| `beeps` | Digital beeps: three short pairs of electronic beeps |
-| `gong` | Gong: one deep, slow strike |
-
-Each sound is synthesised in code on first use into `~/.agent-office/sounds/`,
-at full volume, and played with `afplay` on macOS, `paplay` or `aplay` on
-Linux, and PowerShell on Windows. How loud it is then depends on your system
-volume.
-
-## Notifications and reminders
-
-Next to the sound, a desktop notification says who is waiting and why, for
-example "web-shop (Explore) needs your OK". On macOS it comes from Script
-Editor: if none appears, allow Script Editor in System Settings, Notifications.
-On Linux it uses `notify-send`.
-
-While a session keeps waiting, the sound and the notification come again every
-few minutes (3 by default) until you answer. Both are in Settings.
-
-## How it works
-
-```
-claude ──hook (async)──▶ bin/hook.mjs ──POST /api/event──▶ bin/server.mjs ──SSE──▶ web/app.js
-                              │ server down?                  │ state machine (lib/state.mjs)
-                              └─▶ starts it in the background  └─▶ ~/.agent-office/state.json
-```
-
-- **Hooks**: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`,
-  `PostToolUseFailure`, `Notification`, `Stop`, `StopFailure`, `SubagentStart`,
-  `SubagentStop`, `SessionEnd`. They are `async`, so Claude never waits for them,
-  and they always exit 0 without printing.
-- **States**: a prompt makes a session `busy`, `Stop` makes it `idle`, a permission
-  or question notification makes it `needs-you` until the next tool result,
-  `SessionEnd` walks it out. Sessions that report nothing for 6 hours are dropped.
-- **Esc**: an interrupt fires no hook, but Claude Code writes
-  `[Request interrupted by user]` into the session's transcript. The server
-  watches the end of the transcript of a working session and makes it `idle`
-  within about two seconds. If that ever fails, `busy` still falls back to
-  `idle` after 15 minutes without news.
-- **Subagents**: tool events from inside a subagent carry its `agent_id` and
-  `agent_type`. The label is the `description` of the matching `Agent` call.
-
-## Privacy
-
-The hook keeps only names: the event, the session id, the project folder name,
-the tool name and a short label (a file's base name, a Bash command's
-`description`, a search pattern, a URL's host). It never keeps prompts, replies,
-file contents, full commands or tool output. The server listens on
-`127.0.0.1` only, refuses other `Host` headers (DNS rebinding), and takes events
-only as JSON from no origin or its own.
-
-To spot an Esc, the server reads the last 16 KB of a working session's
-transcript, only for files under `~/.claude/projects/`, and only looks for the
-interrupt record. Nothing from the transcript is kept, shown or sent; the page
-never learns the transcript's path.
+| `agent-office install [--yes]` | add the hooks to `~/.claude/settings.json`, after yours; a backup goes to `~/.agent-office/backups/` |
+| `agent-office uninstall [--yes]` | remove exactly those hooks (they all end in `# agent-office`) |
+| `agent-office open` | open the page, starting the server if needed |
+| `agent-office on` / `off` | start it in the background, or stop it |
+| `agent-office start [--no-open]` | run the server in this terminal |
+| `agent-office status` | running or not, hooks installed or not, which sound |
+| `agent-office sound on` / `off` | turn the sound on or off |
+| `agent-office sound list` | list the sounds; `*` marks the chosen one |
+| `agent-office sound use <name>` | pick a sound: `bell`, `alarm`, `ship`, `chime`, `beeps` or `gong` |
+| `agent-office sound test [name]` | play the chosen sound, or another one, now |
+| `agent-office demo [--short]` | three made-up sessions and their subagents for about a minute |
 
 ## Settings
 
-`~/.agent-office/config.json` (all optional):
+The page and the terminal save to the same file, `~/.agent-office/config.json`.
+Everything is optional:
 
 ```json
 {
@@ -195,19 +173,138 @@ never learns the transcript's path.
 }
 ```
 
-`openBrowser` is `when-closed` (open the page when a session starts and none is
-open, at most every 10 minutes), `on-start` (only when the server starts) or
-`never`. `bell` turns the sound on or off, `sound` picks it, `notify` turns the
-desktop notification on or off, and `remindMinutes` is 0, 1, 3, 5 or 10 (0: no
-reminders). `AGENT_OFFICE_PORT` overrides the port.
+| key | meaning |
+| --- | --- |
+| `port` | where the office listens; `AGENT_OFFICE_PORT` overrides it |
+| `openBrowser` | `when-closed`: open the page when a session starts and none is open (at most every 10 minutes); `on-start`: only when the server starts; `never` |
+| `forgetAfterHours` | drop sessions that reported nothing for this long |
+| `bell` | play a sound when an agent needs you |
+| `sound` | `bell`, `alarm`, `ship`, `chime`, `beeps` or `gong` |
+| `notify` | show a desktop notification too |
+| `remindMinutes` | 0, 1, 3, 5 or 10; 0 means no reminders |
 
-Files: `~/.agent-office/` holds `state.json`, `run.json`, `server.log` and the
-settings backups.
+`~/.agent-office/` also holds `state.json`, `run.json`, `server.log`, the
+synthesised sounds and the settings backups.
+
+## How it works
+
+```
+claude ──hook (async)──▶ bin/hook.mjs ──POST /api/event──▶ bin/server.mjs ──SSE──▶ the page
+                              │ server down?                  │ state machine (lib/state.mjs)
+                              └─▶ starts it in the background  └─▶ ~/.agent-office/state.json
+```
+
+- **Hooks**: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`,
+  `PostToolUseFailure`, `Notification`, `Stop`, `StopFailure`, `SubagentStart`,
+  `SubagentStop`, `SessionEnd`. They are `async`, so Claude never waits for them,
+  and they always exit 0 without printing anything.
+- **States**: a prompt makes a session `busy`, `Stop` makes it `idle`, and
+  `SessionEnd` walks it out. A permission or input notification, Claude's own
+  question (`AskUserQuestion`) or a plan approval (`ExitPlanMode`) makes it
+  `needs-you` until the answer comes back. Sessions that report nothing for 6
+  hours are dropped.
+- **Esc**: an interrupt fires no hook, but Claude Code writes
+  `[Request interrupted by user]` into the session's transcript. The server
+  watches the end of a working session's transcript and makes it `idle` within
+  about two seconds. If that ever fails, `busy` still falls back to `idle` after
+  15 minutes without news.
+- **Subagents**: tool events from inside a subagent carry its `agent_id` and
+  `agent_type`. Its label is the `description` of the matching `Agent` call.
+- **Sounds** are synthesised in code on first use into `~/.agent-office/sounds/`
+  and played with `afplay` on macOS, `paplay` or `aplay` on Linux, and
+  PowerShell on Windows. **Notifications** use `osascript` on macOS and
+  `notify-send` on Linux.
+- **The page** is plain canvas 2D: an isometric projection with lit 3D boxes,
+  soft shadows from the windows, a light layer for the night, and small 3D
+  skeletons for people, so they look right from every side.
+
+## Privacy and security
+
+- The hook keeps only names: the event, the session id, the project folder name,
+  the tool name and a short label (a file's base name, a Bash command's
+  `description`, a search pattern, a URL's host). It never keeps prompts,
+  replies, file contents, full commands or tool output.
+- To spot an Esc, the server reads the last 16 KB of a working session's
+  transcript, only for files under `~/.claude/projects/`, and only looks for the
+  interrupt record. Nothing from the transcript is kept, shown or sent, and the
+  page never learns the transcript's path.
+- The server listens on `127.0.0.1` only, refuses other `Host` headers (against
+  DNS rebinding), and takes events and settings only as JSON from no origin or
+  its own page, so other websites cannot feed it or change your settings.
+- Notification text is passed to the system tool as arguments, never inside a
+  script, so a project name cannot run anything.
+- Nothing leaves your machine.
+
+## Troubleshooting
+
+**I hear nothing.** Run `agent-office sound test`. If that is silent, turn the
+system volume up (the sounds are at full volume already). If that plays but
+agents don't, check that the sound is on: `agent-office status`.
+
+**No desktop notifications on macOS.** They come from Script Editor. Allow
+Script Editor in System Settings, Notifications, then try a prompt again.
+
+**The page didn't open.** Run `agent-office open`. The page opens by itself only
+when a session starts and no page is open, at most every 10 minutes.
+
+**A session stays "working" after it stopped.** Pressing Esc is caught from the
+transcript within seconds; anything else falls back to idle after 15 minutes.
+Sending the next prompt fixes it right away.
+
+**Port 47800 is in use.** Set another one, for example `{"port": 47900}` in
+`~/.agent-office/config.json`, then run `agent-office off` and
+`agent-office open`.
+
+**See what the server did.** Look in `~/.agent-office/server.log`.
+
+## Uninstall
+
+```bash
+agent-office uninstall    # removes only the hooks it added
+agent-office off
+npm unlink -g agent-office
+rm -rf ~/.agent-office    # state, settings, sounds, backups
+```
+
+## Development
+
+```bash
+npm test
+```
+
+That runs 24 tests: the state machine and privacy filter, the floor plan and
+paths, the 3D draw order, the sounds, and a real server in a temporary home
+with sound and notifications muted (host and origin checks, settings, sound,
+notifications, reminders, Esc). Edit a file in `web/` and reload the page: the
+server reads it on every request.
+
+| path | what it holds |
+| --- | --- |
+| `bin/agent-office.mjs` | the command line |
+| `bin/hook.mjs` | the hook Claude Code runs; starts the server when needed |
+| `bin/server.mjs` | the HTTP server, live stream, sound, notifications, reminders |
+| `lib/state.mjs` | the state machine: sessions, subagents, who waits for you |
+| `lib/extract.mjs` | turns a hook payload into a small, privacy-safe event |
+| `lib/sounds.mjs`, `lib/notify.mjs` | the sounds and the desktop notifications |
+| `lib/transcript.mjs` | spotting an Esc in a transcript |
+| `web/app.js` | the page's frame loop and live data |
+| `web/office.js` | what people do: seats, breaks, hand-offs, walking |
+| `web/render.js` | drawing a frame: layers, light, pins, labels |
+| `web/camera.js`, `web/input.js` | zoom and pan; mouse, touch and keys |
+| `web/panel.js`, `web/settings.js` | the side panel and the settings panel |
+| `web/map.js` | the floor plan and path finding |
+| `web/iso.js`, `web/scene.js`, `web/furniture.js` | the 3D projection, walls and glass, and every piece of furniture |
+| `web/people.js`, `web/look.js` | people and how each one looks |
+| `web/floors.js` | floors, rugs and the time of day |
 
 ## Credits
 
-Ideas from [clalt](https://github.com/dhitalkamal/clalt) (MIT): the hook-fed state
-machine, the room per agent type and the paper hand-off. Also from
+Ideas from [clalt](https://github.com/dhitalkamal/clalt) (MIT): the hook-fed
+state machine, a room per agent type and the paper hand-off. Also from
 [office-for-claude-agents](https://github.com/percheniy/office-for-claude-agents):
 the office and the idle activities. No code or art was copied: everything is
 drawn in code.
+
+## License
+
+[MIT](LICENSE)

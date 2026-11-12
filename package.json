@@ -1,10 +1,28 @@
 {
   "name": "agent-office",
   "version": "0.1.0",
-  "description": "A live 3D office of your Claude Code sessions and subagents, fed by Claude Code hooks.",
+  "description": "A live 3D office of your Claude Code sessions and subagents, with a sound and a notification when one needs you.",
+  "keywords": [
+    "claude-code",
+    "claude",
+    "hooks",
+    "agents",
+    "subagents",
+    "dashboard",
+    "visualization"
+  ],
+  "author": "ahmettulutas",
+  "license": "MIT",
+  "homepage": "https://github.com/ahmettulutas/agent-office#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ahmettulutas/agent-office.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ahmettulutas/agent-office/issues"
+  },
   "type": "module",
   "private": true,
-  "license": "MIT",
   "engines": {
     "node": ">=20"
   },
