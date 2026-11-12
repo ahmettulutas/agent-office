@@ -43,7 +43,10 @@ export function reasonText(r) {
       return "needs your OK";
     case "elicitation_dialog":
     case "elicitation_url_dialog":
+    case "question":
       return "has a question";
+    case "plan_approval":
+      return "wants a plan approved";
     case "agent_needs_input":
       return "needs input";
     default:

@@ -146,3 +146,21 @@ test("the last alert says who and why", () => {
   o.apply({ ...S, event: "Notification", notification: "permission_prompt", agentId: "a1", agentType: "Explore" }, t + 2);
   assert.deepEqual(o.lastAlert, { session: "s1", project: "web-shop", reason: "permission_prompt", agentType: "Explore" });
 });
+
+test("Claude asking a question or a plan approval waits for you until it is answered", () => {
+  for (const [tool, reason] of [["AskUserQuestion", "question"], ["ExitPlanMode", "plan_approval"]]) {
+    const o = new Office();
+    const t = Date.now();
+    o.apply({ ...S, event: "UserPromptSubmit" }, t);
+    o.apply({ ...S, event: "PreToolUse", tool, toolUseId: "q1" }, t + 1);
+    assert.equal(get(o).state, "needs-you");
+    assert.equal(get(o).reason, reason);
+    assert.equal(o.alerts, 1);
+    assert.equal(o.lastAlert.reason, reason);
+    // a permission notice for the same tool does not ring twice
+    o.apply({ ...S, event: "Notification", notification: "permission_prompt" }, t + 2);
+    assert.equal(o.alerts, 1);
+    o.apply({ ...S, event: "PostToolUse", tool, toolUseId: "q1" }, t + 3);
+    assert.equal(get(o).state, "busy");
+  }
+});
