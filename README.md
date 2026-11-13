@@ -241,6 +241,11 @@ claude ──hook (async)──▶ bin/hook.mjs ──POST /api/event──▶ b
   review the file before sharing it. Only `~/.claude/projects/` files are read
   (symlinks resolved), huge transcripts are read from their tail with a size cap,
   and the request must come from the office page itself.
+  With export on, "Replay in panel" shows the same *safe* trace as a short
+  timeline in the page (drawn with `textContent`, kept in memory only, nothing
+  downloaded). To open a downloaded file in [agent-replay](https://github.com/ahmettulutas/agent-replay)
+  instead, run it locally; pasting a trace into a hosted site is your own action
+  and sends it off your machine.
 - The token card is **off by default** (`metrics`). When on, it reads only
   counter fields (`usage`, and the last `cost-state`) from the selected
   session's transcript; no prompt or reply text, path or repo name is kept or

@@ -4,6 +4,7 @@
 import { walkers, office } from "./office.js";
 import { follow } from "./camera.js";
 import { ui, on, el, STATE_LABEL, relTime } from "./ui.js";
+import { timelineRows } from "./replay.js";
 
 const list = document.getElementById("list");
 const details = document.getElementById("details");
@@ -154,6 +155,40 @@ async function download(id, mode) {
   renderDetails();
 }
 
+const replays = new Map(); // session -> {rows, omitted, truncated} | "loading" | "failed"
+
+async function loadReplay(id) {
+  replays.set(id, "loading");
+  renderDetails();
+  try {
+    const r = await fetch("/api/export", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ session: id, mode: "safe" }) });
+    if (!r.ok) throw new Error(String(r.status));
+    replays.set(id, timelineRows(await r.json()));
+  } catch {
+    replays.set(id, "failed");
+  }
+  renderDetails();
+}
+
+function replayView(id) {
+  const v = replays.get(id);
+  const box = el("div", "replay");
+  if (v === "loading") return box.appendChild(el("div", "tip-line muted", "Reading the transcript…")), box;
+  if (v === "failed") return box.appendChild(el("div", "tip-line err", "The transcript could not be read.")), box;
+  if (!v) return null;
+  box.append(el("div", "tip-line muted", "Safe view: thinking left out, tool results cut short. Kept in this page only."));
+  if (v.omitted || v.truncated) box.append(el("div", "tip-line muted", "Older steps are not shown."));
+  const ul = el("ul", "log");
+  for (const r of v.rows) {
+    const li = el("li", `rp-${r.kind}${r.error ? " fail" : ""}`);
+    li.append(el("span", "log-tool", r.label), el("span", "log-detail", r.text));
+    li.title = r.text;
+    ul.append(li);
+  }
+  box.append(ul);
+  return box;
+}
+
 function exportCard(id) {
   const box = el("div", "export");
   const btn = el("button", "follow", exportOpen.has(id) ? "Hide export" : "Export trace…");
@@ -179,6 +214,13 @@ function exportCard(id) {
     box.append(b, el("div", "tip-line muted", about));
   }
   if (exportNote.has(id)) box.append(el("div", "tip-line", exportNote.get(id)));
+  const rb = el("button", "follow", replays.has(id) ? "Refresh replay" : "Replay in panel");
+  rb.type = "button";
+  rb.title = "Step through the conversation here (safe mode, nothing is downloaded)";
+  rb.addEventListener("click", () => loadReplay(id));
+  box.append(rb);
+  const rv = replayView(id);
+  if (rv) box.append(rv);
   return box;
 }
 
