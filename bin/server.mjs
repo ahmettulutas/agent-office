@@ -13,6 +13,7 @@ import { play, soundById, soundList } from "../lib/sounds.mjs";
 import { notify, alertText } from "../lib/notify.mjs";
 import { isTranscript, lastInterrupt, resolveTranscript } from "../lib/transcript.mjs";
 import { exportTranscript } from "../lib/trace-export.mjs";
+import { createMetricsService } from "../lib/metrics.mjs";
 import {
   ROOT,
   STATE_FILE,
@@ -297,8 +298,24 @@ function handleExport(req, res) {
   });
 }
 
+// observed counters for one session, read from its transcript (counters only)
+const metricsService = createMetricsService();
+async function handleMetrics(url, res) {
+  if (!cfg.metrics) return send(res, 404, { error: "off" });
+  const s = office.sessions.get(url.searchParams.get("session") || "");
+  if (!s || !s.transcript) return send(res, 404, { error: "unknown session" });
+  try {
+    const file = await resolveTranscript(s.transcript);
+    if (!file) return send(res, 404, { error: "no transcript" });
+    send(res, 200, await metricsService.get(file, s.id));
+  } catch (err) {
+    log("metrics failed:", err.message);
+    send(res, 500, { error: "metrics" });
+  }
+}
+
 // settings the page can change: the sound on or off, which sound, and a preview
-const settingsBody = () => ({ bell: cfg.bell, sound: cfg.sound, notify: cfg.notify, exportEnabled: cfg.exportEnabled, remindMinutes: cfg.remindMinutes, remindChoices: REMIND_CHOICES, sounds: soundList() });
+const settingsBody = () => ({ bell: cfg.bell, sound: cfg.sound, notify: cfg.notify, exportEnabled: cfg.exportEnabled, metrics: cfg.metrics, remindMinutes: cfg.remindMinutes, remindChoices: REMIND_CHOICES, sounds: soundList() });
 let lastPreview = 0;
 function handleSettings(req, res) {
   readJson(req, res, (body) => {
@@ -306,6 +323,7 @@ function handleSettings(req, res) {
     const patch = {};
     if (typeof body.bell === "boolean" && body.bell !== cfg.bell) patch.bell = body.bell;
     if (typeof body.notify === "boolean" && body.notify !== cfg.notify) patch.notify = body.notify;
+    if (typeof body.metrics === "boolean" && body.metrics !== cfg.metrics) patch.metrics = body.metrics;
     if (body.remindMinutes !== undefined) {
       if (!REMIND_CHOICES.includes(body.remindMinutes)) return send(res, 400, { error: "bad reminder" });
       if (body.remindMinutes !== cfg.remindMinutes) patch.remindMinutes = body.remindMinutes;
@@ -349,6 +367,7 @@ const server = http.createServer((req, res) => {
   if (url.pathname === "/api/ping") return send(res, 200, { app: "agent-office", pid: process.pid, port: cfg.port });
   if (url.pathname === "/api/state") return send(res, 200, office.snapshot());
   if (url.pathname === "/api/settings") return send(res, 200, settingsBody());
+  if (url.pathname === "/api/metrics") return handleMetrics(url, res);
   if (url.pathname === "/api/stream") {
     res.writeHead(200, { ...SECURITY_HEADERS, "content-type": "text/event-stream", connection: "keep-alive" });
     res.write(`retry: 2000\ndata: ${JSON.stringify(office.snapshot())}\n\n`);

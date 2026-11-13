@@ -217,3 +217,50 @@ test("export: reported in settings, off by default, not changeable from the page
   const r = await request("POST", "/api/settings", { body: { exportEnabled: false } });
   assert.equal(r.json.exportEnabled, true);
 });
+
+// ---------- metrics ----------
+test("metrics: off by default, switched on from the page, counters only, known sessions only", async () => {
+  const { DEFAULT_CONFIG } = await import("../lib/paths.mjs");
+  assert.equal(DEFAULT_CONFIG.metrics, false);
+  const file = path.join(CLAUDE, "projects", "p", "met.jsonl");
+  const TEXT = "PRIVATE-PROMPT-TEXT";
+  fs.writeFileSync(
+    file,
+    [
+      { type: "assistant", uuid: "a", message: { id: "m1", model: "claude-x", content: [{ type: "text", text: TEXT }], usage: { input_tokens: 3, output_tokens: 4, cache_read_input_tokens: 5, cache_creation_input_tokens: 6 } } },
+      { type: "cost-state", totalCostUSD: 0.5, totalAPIDuration: 10, totalToolDuration: 20, totalDuration: 30, modelUsage: { "claude-x": { costUSD: 0.5 } } },
+    ].map((r) => JSON.stringify(r)).join("\n") + "\n",
+  );
+  await event({ event: "UserPromptSubmit", session: "me1", cwd: "/work/me", transcript: file });
+
+  assert.equal((await request("GET", "/api/settings")).json.metrics, false);
+  assert.equal((await request("GET", "/api/metrics?session=me1")).status, 404, "off: nothing is read");
+
+  assert.equal((await request("POST", "/api/settings", { body: { metrics: true }, headers: { origin: "https://evil.example" } })).status, 403);
+  assert.equal((await request("POST", "/api/settings", { body: { metrics: true } })).json.metrics, true);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(HOME, "config.json"), "utf8")).metrics, true);
+
+  const r = await request("GET", "/api/metrics?session=me1");
+  assert.equal(r.status, 200);
+  assert.equal(r.json.sessionId, "me1");
+  assert.deepEqual(r.json.totals, { input: 3, output: 4, cacheRead: 5, cacheWrite: 6, cacheHitRatio: 5 / 14, costUsd: 0.5 });
+  assert.equal(r.json.confidence, "observed");
+  assert.equal(JSON.stringify(r.json).includes(TEXT), false);
+  assert.equal(JSON.stringify(r.json).includes(HOME), false);
+  assert.equal((await request("GET", "/api/metrics?session=ghost")).status, 404);
+  assert.equal((await request("GET", "/api/metrics")).status, 404);
+
+  await request("POST", "/api/settings", { body: { metrics: false } });
+  assert.equal((await request("GET", "/api/metrics?session=me1")).status, 404);
+});
+
+test("metrics: a transcript that left the projects folder through a symlink is refused", async () => {
+  const outside = path.join(HOME, "outside-m.jsonl");
+  fs.writeFileSync(outside, JSON.stringify({ type: "assistant", message: { id: "x", model: "m", usage: { input_tokens: 1 } } }) + "\n");
+  const link = path.join(CLAUDE, "projects", "p", "linkm.jsonl");
+  fs.symlinkSync(outside, link);
+  await event({ event: "UserPromptSubmit", session: "me2", cwd: "/work/me2", transcript: link });
+  await request("POST", "/api/settings", { body: { metrics: true } });
+  assert.equal((await request("GET", "/api/metrics?session=me2")).status, 404);
+  await request("POST", "/api/settings", { body: { metrics: false } });
+});
