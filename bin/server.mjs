@@ -11,7 +11,8 @@ import { Office } from "../lib/state.mjs";
 import { clean } from "../lib/extract.mjs";
 import { play, soundById, soundList } from "../lib/sounds.mjs";
 import { notify, alertText } from "../lib/notify.mjs";
-import { isTranscript, lastInterrupt } from "../lib/transcript.mjs";
+import { isTranscript, lastInterrupt, resolveTranscript } from "../lib/transcript.mjs";
+import { exportTranscript } from "../lib/trace-export.mjs";
 import {
   ROOT,
   STATE_FILE,
@@ -267,8 +268,37 @@ function handleEvent(req, res) {
   });
 }
 
+// export one session's transcript: nothing is stored, the file is rebuilt per
+// request and handed to the page as a download. Only counters reach the log.
+let exporting = false;
+function handleExport(req, res) {
+  if (!cfg.exportEnabled) return send(res, 404, { error: "off" });
+  if (!req.headers.origin) return send(res, 403, { error: "origin" }); // the page only: a hook has no reason to export
+  readJson(req, res, async (body) => {
+    const s = body && typeof body.session === "string" ? office.sessions.get(body.session) : null;
+    if (!s || !s.transcript) return send(res, 404, { error: "unknown session" });
+    if (body.mode !== undefined && body.mode !== "safe" && body.mode !== "full") return send(res, 400, { error: "bad mode" });
+    if (exporting) return send(res, 429, { error: "busy" });
+    exporting = true;
+    try {
+      const file = await resolveTranscript(s.transcript);
+      if (!file) return send(res, 404, { error: "no transcript" });
+      const trace = await exportTranscript(file, { mode: body.mode || "safe" });
+      log(`export: ${trace.privacy}, ${trace.stats.messages} messages, ${trace.stats.toolCalls} tool calls${trace.truncated ? ", truncated" : ""}`);
+      const name = `agent-office-trace-${s.id.replace(/[^A-Za-z0-9]/g, "").slice(0, 8) || "session"}.json`;
+      res.writeHead(200, { ...SECURITY_HEADERS, "content-type": "application/json", "content-disposition": `attachment; filename="${name}"` });
+      res.end(JSON.stringify(trace));
+    } catch (err) {
+      log("export failed:", err.message);
+      send(res, 500, { error: "export" });
+    } finally {
+      exporting = false;
+    }
+  });
+}
+
 // settings the page can change: the sound on or off, which sound, and a preview
-const settingsBody = () => ({ bell: cfg.bell, sound: cfg.sound, notify: cfg.notify, remindMinutes: cfg.remindMinutes, remindChoices: REMIND_CHOICES, sounds: soundList() });
+const settingsBody = () => ({ bell: cfg.bell, sound: cfg.sound, notify: cfg.notify, exportEnabled: cfg.exportEnabled, remindMinutes: cfg.remindMinutes, remindChoices: REMIND_CHOICES, sounds: soundList() });
 let lastPreview = 0;
 function handleSettings(req, res) {
   readJson(req, res, (body) => {
@@ -313,6 +343,7 @@ const server = http.createServer((req, res) => {
 
   if (req.method === "POST" && url.pathname === "/api/event") return handleEvent(req, res);
   if (req.method === "POST" && url.pathname === "/api/settings") return handleSettings(req, res);
+  if (req.method === "POST" && url.pathname === "/api/export") return handleExport(req, res);
   if (req.method !== "GET" && req.method !== "HEAD") return send(res, 405, { error: "method" });
 
   if (url.pathname === "/api/ping") return send(res, 200, { app: "agent-office", pid: process.pid, port: cfg.port });

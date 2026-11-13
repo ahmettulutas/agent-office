@@ -75,6 +75,65 @@ export function renderSide() {
   renderDetails();
 }
 
+// ---------- export (only when exportEnabled is on) ----------
+let exportOn = false;
+fetch("/api/settings")
+  .then((r) => r.json())
+  .then((j) => {
+    exportOn = j.exportEnabled === true;
+    renderDetails();
+  })
+  .catch(() => {});
+const exportOpen = new Set(); // sessions whose export options are showing
+const exportNote = new Map(); // session -> last result line
+
+async function download(id, mode) {
+  exportNote.set(id, "Building the file…");
+  renderDetails();
+  try {
+    const r = await fetch("/api/export", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ session: id, mode }) });
+    if (!r.ok) throw new Error(r.status === 429 ? "another export is running" : "the transcript could not be read");
+    const blob = await r.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `agent-office-trace-${String(id).replace(/[^A-Za-z0-9]/g, "").slice(0, 8) || "session"}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    exportNote.set(id, "Saved to your downloads.");
+  } catch (err) {
+    exportNote.set(id, `Export failed: ${err.message}`);
+  }
+  renderDetails();
+}
+
+function exportCard(id) {
+  const box = el("div", "export");
+  const btn = el("button", "follow", exportOpen.has(id) ? "Hide export" : "Export trace…");
+  btn.type = "button";
+  btn.addEventListener("click", () => {
+    if (exportOpen.has(id)) exportOpen.delete(id);
+    else exportOpen.add(id);
+    renderDetails();
+  });
+  box.append(btn);
+  if (!exportOpen.has(id)) return box;
+  box.append(
+    el("div", "tip-line muted", "Makes a JSON file of this session for agent-replay and similar tools. Secret patterns are removed on a best-effort basis; review the file before sharing it."),
+  );
+  for (const [mode, label, about] of [
+    ["safe", "Safe", "prompts, replies, tool names; thinking dropped, tool results cut short"],
+    ["full", "Full", "everything, including thinking and complete tool results and inputs"],
+  ]) {
+    const b = el("button", "follow", `Download ${label}`);
+    b.type = "button";
+    b.title = about;
+    b.addEventListener("click", () => download(id, mode));
+    box.append(b, el("div", "tip-line muted", about));
+  }
+  if (exportNote.has(id)) box.append(el("div", "tip-line", exportNote.get(id)));
+  return box;
+}
+
 function renderDetails() {
   const w = ui.selectedKey && walkers.get(ui.selectedKey);
   details.hidden = !w;
@@ -92,6 +151,7 @@ function renderDetails() {
   if (w.kind === "main") {
     details.append(el("div", "tip-line muted", `session ${String(d.id).slice(0, 8)}`));
     if (d.error) details.append(el("div", "tip-line err", `last turn ended with ${d.error}`));
+    if (exportOn) details.append(exportCard(d.id));
   }
   const log = (d.log || []).slice().reverse();
   if (log.length) {
