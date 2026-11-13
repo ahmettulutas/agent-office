@@ -10,12 +10,14 @@ const soundOn = document.getElementById("sound-on");
 const soundList = document.getElementById("sound-list");
 const note = document.getElementById("settings-note");
 const notifyOn = document.getElementById("notify-on");
+const metricsOn = document.getElementById("metrics-on");
 const remind = document.getElementById("remind");
-let prefs = { bell: true, sound: "bell", notify: true, remindMinutes: 3, remindChoices: [], sounds: [] };
+let prefs = { bell: true, sound: "bell", notify: true, metrics: false, remindMinutes: 3, remindChoices: [], sounds: [] };
 
 function render() {
   soundOn.checked = prefs.bell;
   notifyOn.checked = prefs.notify;
+  metricsOn.checked = prefs.metrics === true;
   remind.replaceChildren(
     ...prefs.remindChoices.map((m) => {
       const o = el("option", "", m ? `every ${m} min` : "never");
@@ -90,3 +92,4 @@ document.addEventListener("pointerdown", (ev) => {
   if (!panel.hidden && !panel.contains(ev.target) && ev.target !== openBtn) openSettings(false);
 });
 save();
+metricsOn.addEventListener("change", () => save({ metrics: metricsOn.checked }, metricsOn.checked ? "Token card on" : "Token card off"));

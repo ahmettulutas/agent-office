@@ -4,6 +4,7 @@
 import { walkers, office } from "./office.js";
 import { follow } from "./camera.js";
 import { ui, on, el, STATE_LABEL, relTime } from "./ui.js";
+import { timelineRows } from "./replay.js";
 
 const list = document.getElementById("list");
 const details = document.getElementById("details");
@@ -40,6 +41,7 @@ function counts() {
 
 export function select(key) {
   ui.selectedKey = key;
+  loadMetrics(key);
   renderSide();
 }
 
@@ -75,6 +77,153 @@ export function renderSide() {
   renderDetails();
 }
 
+// ---------- metrics (only when the metrics setting is on) ----------
+const metricsCache = new Map(); // session id -> summary | "none"
+const nf = new Intl.NumberFormat("en-US");
+
+function sessionOf(key) {
+  const w = key && walkers.get(key);
+  return w && w.kind === "main" ? w.data : null;
+}
+
+async function loadMetrics(key) {
+  const d = sessionOf(key);
+  if (!d || !metricsOn) return;
+  try {
+    const r = await fetch(`/api/metrics?session=${encodeURIComponent(d.id)}`);
+    metricsCache.set(d.id, r.ok ? await r.json() : "none");
+  } catch {
+    metricsCache.set(d.id, "none");
+  }
+  if (ui.selectedKey === key) renderDetails();
+}
+
+// refresh only while the session is selected and working
+setInterval(() => {
+  const d = sessionOf(ui.selectedKey);
+  if (metricsOn && d && d.state === "busy") loadMetrics(ui.selectedKey);
+}, 10000);
+
+function metricsCard(id) {
+  const m = metricsCache.get(id);
+  if (!m || m === "none") return null;
+  const box = el("div", "metrics");
+  box.append(el("h3", "", "Tokens (observed, main session only)"));
+  const t = m.totals;
+  const lines = [
+    `in ${nf.format(t.input)} · out ${nf.format(t.output)}`,
+    `cache read ${nf.format(t.cacheRead)} · write ${nf.format(t.cacheWrite)}`,
+    `cache hit ${t.cacheHitRatio === null ? "unknown" : `${Math.round(t.cacheHitRatio * 100)}%`}`,
+    `cost ${t.costUsd === null ? "unknown" : `$${t.costUsd.toFixed(2)}`}`,
+  ];
+  if (m.durationsMs.api !== null) lines.push(`API ${Math.round(m.durationsMs.api / 1000)}s · tools ${Math.round((m.durationsMs.tools || 0) / 1000)}s`);
+  if (m.partial) lines.push("large transcript: newest part only");
+  for (const l of lines) box.append(el("div", "tip-line", l));
+  return box;
+}
+
+// ---------- export (only when exportEnabled is on) ----------
+let exportOn = false;
+let metricsOn = false;
+fetch("/api/settings")
+  .then((r) => r.json())
+  .then((j) => {
+    exportOn = j.exportEnabled === true;
+    metricsOn = j.metrics === true;
+    renderDetails();
+  })
+  .catch(() => {});
+const exportOpen = new Set(); // sessions whose export options are showing
+const exportNote = new Map(); // session -> last result line
+
+async function download(id, mode) {
+  exportNote.set(id, "Building the file…");
+  renderDetails();
+  try {
+    const r = await fetch("/api/export", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ session: id, mode }) });
+    if (!r.ok) throw new Error(r.status === 429 ? "another export is running" : "the transcript could not be read");
+    const blob = await r.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `agent-office-trace-${String(id).replace(/[^A-Za-z0-9]/g, "").slice(0, 8) || "session"}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    exportNote.set(id, "Saved to your downloads.");
+  } catch (err) {
+    exportNote.set(id, `Export failed: ${err.message}`);
+  }
+  renderDetails();
+}
+
+const replays = new Map(); // session -> {rows, omitted, truncated} | "loading" | "failed"
+
+async function loadReplay(id) {
+  replays.set(id, "loading");
+  renderDetails();
+  try {
+    const r = await fetch("/api/export", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ session: id, mode: "safe" }) });
+    if (!r.ok) throw new Error(String(r.status));
+    replays.set(id, timelineRows(await r.json()));
+  } catch {
+    replays.set(id, "failed");
+  }
+  renderDetails();
+}
+
+function replayView(id) {
+  const v = replays.get(id);
+  const box = el("div", "replay");
+  if (v === "loading") return box.appendChild(el("div", "tip-line muted", "Reading the transcript…")), box;
+  if (v === "failed") return box.appendChild(el("div", "tip-line err", "The transcript could not be read.")), box;
+  if (!v) return null;
+  box.append(el("div", "tip-line muted", "Safe view: thinking left out, tool results cut short. Kept in this page only."));
+  if (v.omitted || v.truncated) box.append(el("div", "tip-line muted", "Older steps are not shown."));
+  const ul = el("ul", "log");
+  for (const r of v.rows) {
+    const li = el("li", `rp-${r.kind}${r.error ? " fail" : ""}`);
+    li.append(el("span", "log-tool", r.label), el("span", "log-detail", r.text));
+    li.title = r.text;
+    ul.append(li);
+  }
+  box.append(ul);
+  return box;
+}
+
+function exportCard(id) {
+  const box = el("div", "export");
+  const btn = el("button", "follow", exportOpen.has(id) ? "Hide export" : "Export trace…");
+  btn.type = "button";
+  btn.addEventListener("click", () => {
+    if (exportOpen.has(id)) exportOpen.delete(id);
+    else exportOpen.add(id);
+    renderDetails();
+  });
+  box.append(btn);
+  if (!exportOpen.has(id)) return box;
+  box.append(
+    el("div", "tip-line muted", "Makes a JSON file of this session for agent-replay and similar tools. Secret patterns are removed on a best-effort basis; review the file before sharing it."),
+  );
+  for (const [mode, label, about] of [
+    ["safe", "Safe", "prompts, replies, tool names; thinking dropped, tool results cut short"],
+    ["full", "Full", "everything, including thinking and complete tool results and inputs"],
+  ]) {
+    const b = el("button", "follow", `Download ${label}`);
+    b.type = "button";
+    b.title = about;
+    b.addEventListener("click", () => download(id, mode));
+    box.append(b, el("div", "tip-line muted", about));
+  }
+  if (exportNote.has(id)) box.append(el("div", "tip-line", exportNote.get(id)));
+  const rb = el("button", "follow", replays.has(id) ? "Refresh replay" : "Replay in panel");
+  rb.type = "button";
+  rb.title = "Step through the conversation here (safe mode, nothing is downloaded)";
+  rb.addEventListener("click", () => loadReplay(id));
+  box.append(rb);
+  const rv = replayView(id);
+  if (rv) box.append(rv);
+  return box;
+}
+
 function renderDetails() {
   const w = ui.selectedKey && walkers.get(ui.selectedKey);
   details.hidden = !w;
@@ -92,6 +241,11 @@ function renderDetails() {
   if (w.kind === "main") {
     details.append(el("div", "tip-line muted", `session ${String(d.id).slice(0, 8)}`));
     if (d.error) details.append(el("div", "tip-line err", `last turn ended with ${d.error}`));
+    if (metricsOn) {
+      const mc = metricsCard(d.id);
+      if (mc) details.append(mc);
+    }
+    if (exportOn) details.append(exportCard(d.id));
   }
   const log = (d.log || []).slice().reverse();
   if (log.length) {

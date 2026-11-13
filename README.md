@@ -181,6 +181,8 @@ Everything is optional:
 | `bell` | play a sound when an agent needs you |
 | `sound` | `bell`, `alarm`, `ship`, `chime`, `beeps` or `gong` |
 | `notify` | show a desktop notification too |
+| `exportEnabled` | `false` by default. `true` adds an "Export trace" button to a session's details (see [Privacy and security](#privacy-and-security)); only the config file can turn it on |
+| `metrics` | `false` by default. `true` (or the settings switch) shows an observed token, cache-hit and cost card for the selected session (main session only; see [Privacy and security](#privacy-and-security)) |
 | `remindMinutes` | 0, 1, 3, 5 or 10; 0 means no reminders |
 
 `~/.agent-office/` also holds `state.json`, `run.json`, `server.log`, the
@@ -228,6 +230,27 @@ claude ──hook (async)──▶ bin/hook.mjs ──POST /api/event──▶ b
   transcript, only for files under `~/.claude/projects/`, and only looks for the
   interrupt record. Nothing from the transcript is kept, shown or sent, and the
   page never learns the transcript's path.
+- Export is **off by default** (`exportEnabled`). When you turn it on, the
+  button builds a TraceExport v1 JSON (`{messages:[{role, content}]}`, the shape
+  agent-replay reads) from the session's transcript and hands it to the page as
+  a download. Nothing is stored or sent anywhere, and the log only gets counters.
+  *Safe* mode drops thinking, reduces tool input to a short label and cuts tool
+  results short; *Full* keeps everything. In both, common secret patterns (API
+  keys, tokens, `Bearer` headers, URL credentials, private keys, `KEY=value`
+  lines) are redacted **on a best-effort basis**: it cannot catch everything, so
+  review the file before sharing it. Only `~/.claude/projects/` files are read
+  (symlinks resolved), huge transcripts are read from their tail with a size cap,
+  and the request must come from the office page itself.
+  With export on, "Replay in panel" shows the same *safe* trace as a short
+  timeline in the page (drawn with `textContent`, kept in memory only, nothing
+  downloaded). To open a downloaded file in [agent-replay](https://github.com/ahmettulutas/agent-replay)
+  instead, run it locally; pasting a trace into a hosted site is your own action
+  and sends it off your machine.
+- The token card is **off by default** (`metrics`). When on, it reads only
+  counter fields (`usage`, and the last `cost-state`) from the selected
+  session's transcript; no prompt or reply text, path or repo name is kept or
+  sent, and the log only gets counters. Cost and durations are shown only when
+  Claude Code recorded them, otherwise "unknown"; nothing is estimated.
 - The server listens on `127.0.0.1` only, refuses other `Host` headers (against
   DNS rebinding), and takes events and settings only as JSON from no origin or
   its own page, so other websites cannot feed it or change your settings.

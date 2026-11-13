@@ -223,3 +223,9 @@ h1 { font-size: 15px; margin: 0; letter-spacing: .02em; }
 .select-row small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
 .select-row select { flex: none; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; font: inherit; font-size: 13px; }
 .switch-row + .switch-row { border-top: 0; }
+
+.export { margin-top: 8px; }
+.export .follow { margin-top: 4px; }
+.replay { margin-top: 6px; }
+.replay .log li { grid-template-columns: auto 1fr; }
+.replay .rp-user .log-tool { color: var(--sub); }
