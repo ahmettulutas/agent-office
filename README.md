@@ -182,6 +182,7 @@ Everything is optional:
 | `sound` | `bell`, `alarm`, `ship`, `chime`, `beeps` or `gong` |
 | `notify` | show a desktop notification too |
 | `remindMinutes` | 0, 1, 3, 5 or 10; 0 means no reminders |
+| `contextHealth` | `true` (default): show what a selected session starts with (memory files, rules, skills, agents, commands) as an estimated token count; `false` turns the scan and the card off |
 
 `~/.agent-office/` also holds `state.json`, `run.json`, `server.log`, the
 synthesised sounds and the settings backups.
@@ -228,6 +229,13 @@ claude ──hook (async)──▶ bin/hook.mjs ──POST /api/event──▶ b
   transcript, only for files under `~/.claude/projects/`, and only looks for the
   interrupt record. Nothing from the transcript is kept, shown or sent, and the
   page never learns the transcript's path.
+- The "Starts with" card (`contextHealth`) reads the session's project folder
+  and your `~/.claude`: `CLAUDE.md` files, rules, skills, agents and commands,
+  nothing else. It follows no symlinked folder, caps files and bytes, and sends
+  the page only counts and categories, never a path or file name. The server
+  finds the folder from its own state; the page cannot ask for another one.
+  Numbers are an estimate (characters / 3.7) and a lower bound; plugin skills
+  are not counted.
 - The server listens on `127.0.0.1` only, refuses other `Host` headers (against
   DNS rebinding), and takes events and settings only as JSON from no origin or
   its own page, so other websites cannot feed it or change your settings.
