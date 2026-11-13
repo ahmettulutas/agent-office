@@ -182,6 +182,7 @@ Everything is optional:
 | `sound` | `bell`, `alarm`, `ship`, `chime`, `beeps` or `gong` |
 | `notify` | show a desktop notification too |
 | `exportEnabled` | `false` by default. `true` adds an "Export trace" button to a session's details (see [Privacy and security](#privacy-and-security)); only the config file can turn it on |
+| `metrics` | `false` by default. `true` (or the settings switch) shows an observed token, cache-hit and cost card for the selected session (main session only; see [Privacy and security](#privacy-and-security)) |
 | `remindMinutes` | 0, 1, 3, 5 or 10; 0 means no reminders |
 
 `~/.agent-office/` also holds `state.json`, `run.json`, `server.log`, the
@@ -240,6 +241,11 @@ claude ──hook (async)──▶ bin/hook.mjs ──POST /api/event──▶ b
   review the file before sharing it. Only `~/.claude/projects/` files are read
   (symlinks resolved), huge transcripts are read from their tail with a size cap,
   and the request must come from the office page itself.
+- The token card is **off by default** (`metrics`). When on, it reads only
+  counter fields (`usage`, and the last `cost-state`) from the selected
+  session's transcript; no prompt or reply text, path or repo name is kept or
+  sent, and the log only gets counters. Cost and durations are shown only when
+  Claude Code recorded them, otherwise "unknown"; nothing is estimated.
 - The server listens on `127.0.0.1` only, refuses other `Host` headers (against
   DNS rebinding), and takes events and settings only as JSON from no origin or
   its own page, so other websites cannot feed it or change your settings.
