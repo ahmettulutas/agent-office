@@ -38,8 +38,57 @@ function counts() {
   return { working, waiting, idle, subs };
 }
 
+// What the session starts with. Fetched once per selection (and again after a
+// minute), kept here, and only read while the details are redrawn.
+const ctx = new Map(); // session id -> { state: "loading" | "ok" | "none" | "error", data, t }
+async function loadContext(id) {
+  const hit = ctx.get(id);
+  if (hit && (hit.state === "loading" || Date.now() - hit.t < 60_000)) return;
+  ctx.set(id, { state: "loading", data: hit?.data, t: Date.now() });
+  let next;
+  try {
+    const r = await fetch(`/api/context?session=${encodeURIComponent(id)}`);
+    if (r.status === 404) next = { state: "none" };
+    else if (!r.ok) next = { state: "error" };
+    else {
+      const data = await r.json();
+      next = data.error ? { state: "none" } : { state: "ok", data };
+    }
+  } catch {
+    next = { state: "error" };
+  }
+  ctx.set(id, { ...next, t: Date.now() });
+  renderDetails();
+}
+
+const KIND_LABEL = { memory: "Memory files", rules: "Rules", skills: "Skills", agents: "Agents", commands: "Commands" };
+const fmt = new Intl.NumberFormat("en");
+function contextCard(id) {
+  const c = ctx.get(id);
+  if (!c || c.state === "none") return null;
+  const box = el("div", "ctx");
+  box.append(el("h3", "", "Starts with"));
+  if (c.state === "error") box.append(el("div", "tip-line muted", "Could not read the context."));
+  else if (!c.data) box.append(el("div", "tip-line muted", "Reading…"));
+  else {
+    const d = c.data;
+    box.append(el("div", "tip-line", `about ${fmt.format(d.startupTokens)} tokens at start`));
+    if (d.onDemandTokens) box.append(el("div", "tip-line muted", `+ about ${fmt.format(d.onDemandTokens)} loaded when needed`));
+    const ul = el("ul", "ctx-rows");
+    for (const r of d.rows) {
+      const li = el("li");
+      li.append(el("span", "", `${KIND_LABEL[r.kind] || r.kind} (${r.scope})`), el("span", "muted", `${r.count} · ${fmt.format(r.startupTokens)}`));
+      ul.append(li);
+    }
+    box.append(ul, el("div", "tip-line muted", "Estimate (characters / 3.7), a lower bound. Plugin skills are not counted."));
+  }
+  return box;
+}
+
 export function select(key) {
   ui.selectedKey = key;
+  const w = walkers.get(key);
+  if (w && w.kind === "main") loadContext(w.data.id);
   renderSide();
 }
 
@@ -92,6 +141,8 @@ function renderDetails() {
   if (w.kind === "main") {
     details.append(el("div", "tip-line muted", `session ${String(d.id).slice(0, 8)}`));
     if (d.error) details.append(el("div", "tip-line err", `last turn ended with ${d.error}`));
+    const card = contextCard(d.id);
+    if (card) details.append(card);
   }
   const log = (d.log || []).slice().reverse();
   if (log.length) {

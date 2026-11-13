@@ -74,6 +74,7 @@ before(async () => {
       AGENT_OFFICE_REMIND_TICK: "50",
       AGENT_OFFICE_INTERRUPT_TICK: "50",
       CLAUDE_CONFIG_DIR: CLAUDE,
+      HOME, // the user scope of the context scan stays inside the sandbox
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -148,4 +149,28 @@ test("Esc in the transcript ends the turn; transcripts elsewhere are ignored", a
   assert.equal((await session("esc2")).state, "busy");
   // the transcript path never reaches the page
   assert.equal("transcript" in (await session("esc")), false);
+});
+
+test("context: found from the session's own folder, never from a path in the request", async () => {
+  const proj = path.join(HOME, "work", "ctx-proj");
+  fs.mkdirSync(path.join(proj, ".git"), { recursive: true });
+  fs.writeFileSync(path.join(proj, "CLAUDE.md"), "x".repeat(370));
+  await event({ event: "UserPromptSubmit", session: "ctx1", cwd: proj });
+  const ok = await request("GET", "/api/context?session=ctx1");
+  assert.equal(ok.status, 200);
+  assert.equal(ok.json.rows.find((r) => r.kind === "memory" && r.scope === "project").startupTokens, 100);
+  assert.equal(JSON.stringify(ok.json).includes(HOME), false, "no path in the body");
+  assert.equal(JSON.stringify(ok.json).includes("CLAUDE"), false, "no file name in the body");
+  // a path in the query changes nothing
+  const other = await request("GET", `/api/context?session=ctx1&path=${encodeURIComponent("/etc")}&cwd=/etc`);
+  assert.deepEqual(other.json, ok.json);
+  assert.equal((await request("GET", "/api/context?session=nope")).status, 404);
+  assert.equal((await request("GET", "/api/context")).status, 404);
+  assert.equal((await request("GET", "/api/context?session=ctx1", { headers: { host: "evil.example" } })).status, 421);
+  assert.equal((await request("POST", "/api/context?session=ctx1")).status, 405);
+});
+
+test("settings report contextHealth (on by default)", async () => {
+  const fresh = (await request("GET", "/api/settings")).json;
+  assert.equal(fresh.contextHealth, true);
 });

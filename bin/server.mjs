@@ -11,6 +11,7 @@ import { Office } from "../lib/state.mjs";
 import { clean } from "../lib/extract.mjs";
 import { play, soundById, soundList } from "../lib/sounds.mjs";
 import { notify, alertText } from "../lib/notify.mjs";
+import { createContextService } from "../lib/context.mjs";
 import { isTranscript, lastInterrupt } from "../lib/transcript.mjs";
 import {
   ROOT,
@@ -268,7 +269,22 @@ function handleEvent(req, res) {
 }
 
 // settings the page can change: the sound on or off, which sound, and a preview
-const settingsBody = () => ({ bell: cfg.bell, sound: cfg.sound, notify: cfg.notify, remindMinutes: cfg.remindMinutes, remindChoices: REMIND_CHOICES, sounds: soundList() });
+// startup context of a session: the server finds the folder from its own state,
+// the page never sends a path
+const contextService = createContextService();
+async function handleContext(url, res) {
+  if (!cfg.contextHealth) return send(res, 404, { error: "off" });
+  const s = office.sessions.get(url.searchParams.get("session") || "");
+  if (!s || !s.cwd) return send(res, 404, { error: "unknown session" });
+  try {
+    send(res, 200, await contextService.get(s.cwd));
+  } catch (err) {
+    log("context scan failed:", err.message);
+    send(res, 500, { error: "scan" });
+  }
+}
+
+const settingsBody = () => ({ bell: cfg.bell, sound: cfg.sound, notify: cfg.notify, remindMinutes: cfg.remindMinutes, contextHealth: cfg.contextHealth, remindChoices: REMIND_CHOICES, sounds: soundList() });
 let lastPreview = 0;
 function handleSettings(req, res) {
   readJson(req, res, (body) => {
@@ -318,6 +334,7 @@ const server = http.createServer((req, res) => {
   if (url.pathname === "/api/ping") return send(res, 200, { app: "agent-office", pid: process.pid, port: cfg.port });
   if (url.pathname === "/api/state") return send(res, 200, office.snapshot());
   if (url.pathname === "/api/settings") return send(res, 200, settingsBody());
+  if (url.pathname === "/api/context") return handleContext(url, res);
   if (url.pathname === "/api/stream") {
     res.writeHead(200, { ...SECURITY_HEADERS, "content-type": "text/event-stream", connection: "keep-alive" });
     res.write(`retry: 2000\ndata: ${JSON.stringify(office.snapshot())}\n\n`);
